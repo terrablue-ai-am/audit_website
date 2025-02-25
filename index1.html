@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Audit Feedback Review</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 20px;
+      }
+      .container {
+        max-width: 900px;
+        margin: auto;
+        text-align: left;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 20px;
+      }
+      th,
+      td {
+        border: 1px solid #ddd;
+        padding: 8px;
+        text-align: left;
+      }
+      th {
+        background-color: #f2f2f2;
+      }
+      input,
+      textarea,
+      select {
+        width: 100%;
+        margin-top: 5px;
+        padding: 8px;
+        font-size: 14px;
+      }
+      button {
+        margin-top: 15px;
+        padding: 10px;
+        font-size: 16px;
+        cursor: pointer;
+      }
+      button:disabled {
+        background-color: #ccc;
+        cursor: not-allowed;
+      }
+      .hidden {
+        display: none;
+      }
+      .ticket-row {
+        cursor: pointer;
+      }
+      .ticket-row:hover {
+        background-color: #f5f5f5;
+      }
+      .button-group {
+        display: flex;
+        gap: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h2>Pending Audit Tickets</h2>
+      <table id="ticketTable">
+        <thead>
+          <tr>
+            <th>CID</th>
+            <th>Comments</th>
+          </tr>
+        </thead>
+        <tbody id="ticketList"></tbody>
+      </table>
+
+      <div id="auditForm" class="hidden">
+        <h2>Review AI Response</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Column</th>
+              <th>Value</th>
+            </tr>
+          </thead>
+          <tbody id="dataTable"></tbody>
+        </table>
+
+        <label for="audit_category">Audit Category:</label>
+        <select id="audit_category" required>
+          <option value="">Select a category</option>
+          <option value="Needs human intervention">
+            Needs human intervention
+          </option>
+          <option value="Not wrong">Not wrong</option>
+          <option value="Genuinely wrong">Genuinely wrong</option>
+          <option value="Comment not helpful">Comment not helpful</option>
+          <option value="Existing bug">Existing bug</option>
+          <option value="Custom code">Custom code</option>
+          <option value="Custom code/Feature request">
+            Custom code/Feature request
+          </option>
+          <option value="No context">No context</option>
+          <option value="Feature request">Feature request</option>
+          <option value="Out of scope">Out of scope</option>
+          <option value="AI and HS answers are similar">
+            AI and HS answers are similar
+          </option>
+          <option value="Need input from AM team">
+            Need input from AM team
+          </option>
+          <option value="Spam">Spam</option>
+          <option value="Skip">Skip</option>
+        </select>
+
+        <label for="audit_description">Audit Description:</label>
+        <textarea
+          id="audit_description"
+          placeholder="Enter description"
+          required
+        ></textarea>
+
+        <div class="button-group">
+          <button id="submitButton" onclick="submitFeedback()" disabled>
+            Submit Feedback
+          </button>
+          <button onclick="skipTicket()">Skip</button>
+        </div>
+
+        <p id="status"></p>
+      </div>
+    </div>
+
+    <script>
+      const fetchTicketsURL =
+        "https://us-central1-support-assist-384720.cloudfunctions.net/fetch_audit_feedback";
+      const submitFeedbackURL =
+        "https://us-central1-support-assist-384720.cloudfunctions.net/submit_feedback";
+
+      let currentRowData = {}; // Store the selected row data
+
+      // Fetch all pending tickets (cid & comments)
+      async function fetchTickets() {
+        try {
+          const response = await fetch(fetchTicketsURL, { mode: "cors" });
+          const data = await response.json();
+
+          if (data.status === "success" && Array.isArray(data.data)) {
+            displayTickets(data.data);
+          } else {
+            document.getElementById("ticketList").innerHTML =
+              "<tr><td colspan='2'>No tickets available.</td></tr>";
+          }
+        } catch (error) {
+          console.error("Error fetching tickets:", error);
+        }
+      }
+
+      function displayTickets(tickets) {
+        const ticketList = document.getElementById("ticketList");
+        ticketList.innerHTML = ""; // Clear previous tickets
+
+        tickets.forEach((ticket) => {
+          const row = document.createElement("tr");
+          row.classList.add("ticket-row");
+          row.innerHTML = `<td>${ticket.cid}</td><td>${
+            ticket.comments || "No comments"
+          }</td>`;
+          row.onclick = () => fetchFullTicketDetails(ticket.cid); // Fetch full details on click
+          ticketList.appendChild(row);
+        });
+      }
+
+      // Fetch full ticket details when clicked
+      async function fetchFullTicketDetails(cid) {
+        try {
+          const response = await fetch(`${fetchTicketsURL}?cid=${cid}`, {
+            mode: "cors",
+          });
+          const data = await response.json();
+
+          if (data.status === "success") {
+            loadAuditForm(data.data);
+          } else {
+            alert("Error loading ticket details.");
+          }
+        } catch (error) {
+          console.error("Error fetching ticket details:", error);
+        }
+      }
+
+      // Load full details into the audit form
+      function loadAuditForm(ticket) {
+        currentRowData = ticket; // Store selected ticket data
+        document.getElementById("ticketTable").classList.add("hidden");
+        document.getElementById("auditForm").classList.remove("hidden");
+
+        // Populate table with ticket details
+        const tableBody = document.getElementById("dataTable");
+        tableBody.innerHTML = ""; // Clear previous data
+
+        for (const [key, value] of Object.entries(ticket)) {
+          const row = document.createElement("tr");
+          row.innerHTML = `<td><strong>${key}</strong></td><td>${
+            value !== null ? value : "N/A"
+          }</td>`;
+          tableBody.appendChild(row);
+        }
+
+        document.getElementById("submitButton").disabled = false; // Enable submit button
+      }
+
+      // Submit feedback and return to ticket list
+      async function submitFeedback() {
+        const auditCategory = document.getElementById("audit_category").value;
+        const auditDescription = document
+          .getElementById("audit_description")
+          .value.trim();
+
+        if (!auditCategory || !auditDescription) {
+          alert("Please fill in both fields.");
+          return;
+        }
+
+        // Attach user input to row data
+        currentRowData.audit_category = auditCategory;
+        currentRowData.audit_description = auditDescription;
+
+        try {
+          document.getElementById("submitButton").disabled = true; // Prevent duplicate submissions
+
+          const response = await fetch(submitFeedbackURL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(currentRowData),
+            mode: "cors",
+          });
+
+          if (response.ok) {
+            alert("Feedback submitted!");
+            document.getElementById("audit_category").value = "";
+            document.getElementById("audit_description").value = "";
+            currentRowData = {}; // Clear old data
+
+            returnToTicketList(); // Go back to ticket list
+          } else {
+            alert("Error submitting feedback.");
+          }
+        } catch (error) {
+          console.error("Error:", error);
+          alert("Error submitting feedback. Check console for details.");
+        }
+      }
+
+      // Skip the current ticket and go back to ticket list
+      function skipTicket() {
+        returnToTicketList();
+      }
+
+      // Hide audit form and reload ticket list
+      function returnToTicketList() {
+        document.getElementById("auditForm").classList.add("hidden");
+        document.getElementById("ticketTable").classList.remove("hidden");
+        fetchTickets(); // Reload ticket list
+      }
+
+      // Fetch list of tickets on load
+      window.onload = fetchTickets;
+    </script>
+  </body>
+</html>
