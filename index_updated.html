@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Audit Feedback Review</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 20px;
+      }
+      .container {
+        max-width: 900px;
+        margin: auto;
+        text-align: left;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 20px;
+      }
+      th,
+      td {
+        border: 1px solid #ddd;
+        padding: 8px;
+        text-align: left;
+      }
+      th {
+        background-color: #f2f2f2;
+      }
+      input,
+      textarea,
+      select {
+        width: 100%;
+        margin-top: 5px;
+        padding: 8px;
+        font-size: 14px;
+      }
+      button {
+        margin-top: 15px;
+        padding: 10px;
+        font-size: 16px;
+        cursor: pointer;
+      }
+      button:disabled {
+        background-color: #ccc;
+        cursor: not-allowed;
+      }
+      .hidden {
+        display: none;
+      }
+      .ticket-row {
+        cursor: pointer;
+      }
+      .ticket-row:hover {
+        background-color: #f5f5f5;
+      }
+      .button-group {
+        display: flex;
+        gap: 10px;
+      }
+      .button-container {
+        display: flex;
+        gap: 20px;
+        margin: 20px 0;
+        flex-wrap: wrap;
+      }
+
+      .button-container button {
+        flex: 1 1 200px;
+        padding: 20px;
+        font-size: 16px;
+        font-weight: bold;
+        cursor: pointer;
+        border: none;
+        background-color: #007bff;
+        color: white;
+        border-radius: 6px;
+        transition: background-color 0.3s;
+      }
+
+      .button-container button:hover {
+        background-color: #0056b3;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div id="tableButtons">
+        <p><strong>Select a category to audit:</strong></p>
+        <div class="button-container">
+          <button onclick="selectTable('generative_first_reply')">
+            Generative First Reply
+          </button>
+          <button onclick="selectTable('accounts_and_billings')">
+            Accounts and Billings
+          </button>
+          <button onclick="selectTable('skipped_or_spam')">
+            Skipped or Spam
+          </button>
+        </div>
+      </div>
+
+      <h2 id="tableHeading">Pending Audit Tickets</h2>
+
+      <table id="ticketTable">
+        <thead>
+          <tr>
+            <th>CID</th>
+          </tr>
+        </thead>
+        <tbody id="ticketList"></tbody>
+      </table>
+
+      <div id="auditForm" class="hidden">
+        <h2>Review AI Response</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Column</th>
+              <th>Value</th>
+            </tr>
+          </thead>
+          <tbody id="dataTable"></tbody>
+        </table>
+
+        <label for="audit_category"><strong>Audit Category:</strong></label>
+        <div id="audit_category_container"></div>
+
+        <label for="audit_description">Audit Description:</label>
+        <textarea
+          id="audit_description"
+          placeholder="Enter description"
+          required
+        ></textarea>
+
+        <div class="button-group">
+          <button id="submitButton" onclick="submitFeedback()">
+            Submit Feedback
+          </button>
+          <button onclick="skipTicket()">Skip</button>
+        </div>
+
+        <p id="status"></p>
+      </div>
+    </div>
+
+    <div id="filterSection" class="hidden" style="margin-top: 20px">
+      <h3 style="margin-bottom: 10px">Filters</h3>
+
+      <div style="display: flex; gap: 40px; flex-wrap: wrap">
+        <!-- Product Filter -->
+        <div>
+          <label><strong>Product</strong></label>
+          <div id="productFilters" style="margin-top: 8px">
+            <label style="display: block; margin-bottom: 6px">
+              <input type="checkbox" value="WPForms" /> WPForms
+            </label>
+            <label style="display: block; margin-bottom: 6px">
+              <input type="checkbox" value="AIOSEO" /> AIOSEO
+            </label>
+          </div>
+        </div>
+
+        <!-- Rating Filter -->
+        <div>
+          <label><strong>Rating</strong></label>
+          <div id="ratingFilters" style="margin-top: 8px">
+            <label style="display: block; margin-bottom: 6px">
+              <input type="checkbox" value="Helpful" /> Helpful
+            </label>
+            <label style="display: block; margin-bottom: 6px">
+              <input type="checkbox" value="Harmful" /> Harmful
+            </label>
+            <label style="display: block; margin-bottom: 6px">
+              <input type="checkbox" value="Satisfactory" /> Satisfactory
+            </label>
+            <label style="display: block; margin-bottom: 6px">
+              <input type="checkbox" value="Null" /> Null
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <button onclick="applyFilters()" style="margin-top: 15px">
+        Apply Filters
+      </button>
+    </div>
+
+    <div id="abFilterSection" class="hidden" style="margin-top: 20px">
+      <h3 style="margin-bottom: 10px">Filters</h3>
+
+      <div style="display: flex; gap: 40px; flex-wrap: wrap">
+        <!-- Product Filter -->
+        <div>
+          <label><strong>Product</strong></label>
+          <div style="margin-top: 8px" id="abProductFilters">
+            <label style="display: block; margin-bottom: 6px">
+              <input type="checkbox" value="WPForms" /> WPForms
+            </label>
+            <label style="display: block; margin-bottom: 6px">
+              <input type="checkbox" value="AIOSEO" /> AIOSEO
+            </label>
+          </div>
+        </div>
+
+        <!-- Categorization Rating -->
+        <div>
+          <label><strong>Categorization Rating</strong></label>
+          <div style="margin-top: 8px" id="crFilters">
+            <label style="display: block; margin-bottom: 6px">
+              <input type="checkbox" value="Correct" /> Correct
+            </label>
+            <label style="display: block; margin-bottom: 6px">
+              <input type="checkbox" value="Incorrect" /> Incorrect
+            </label>
+          </div>
+        </div>
+
+        <!-- Saved Reply Rating -->
+        <div>
+          <label><strong>Saved Reply Rating</strong></label>
+          <div style="margin-top: 8px" id="srrFilters">
+            <label style="display: block; margin-bottom: 6px">
+              <input type="checkbox" value="Correct" /> Correct
+            </label>
+            <label style="display: block; margin-bottom: 6px">
+              <input type="checkbox" value="Incorrect" /> Incorrect
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <button onclick="applyABFilters()" style="margin-top: 15px">
+        Apply Filters
+      </button>
+    </div>
+
+    <div id="sosFilterSection" class="hidden" style="margin-top: 20px">
+      <h3 style="margin-bottom: 10px">Filters</h3>
+
+      <div style="display: flex; gap: 40px; flex-wrap: wrap">
+        <!-- Product Filter -->
+        <div>
+          <label><strong>Product</strong></label>
+          <div style="margin-top: 8px" id="sosProductFilters">
+            <label style="display: block; margin-bottom: 6px">
+              <input type="checkbox" value="WPForms" /> WPForms
+            </label>
+            <label style="display: block; margin-bottom: 6px">
+              <input type="checkbox" value="AIOSEO" /> AIOSEO
+            </label>
+          </div>
+        </div>
+
+        <!-- Reason Filter -->
+        <div>
+          <label><strong>Reason</strong></label>
+          <div style="margin-top: 8px" id="reasonFilters">
+            <!-- Dynamically rendered below -->
+          </div>
+        </div>
+      </div>
+
+      <button onclick="applySOSFilters()" style="margin-top: 15px">
+        Apply Filters
+      </button>
+    </div>
+
+    <script>
+      const fetchTicketsURL =
+        "https://fetch-pending-audit-tickets-706657463616.us-central1.run.app";
+      const submitFeedbackURL =
+        "https://submit-audit-decision-706657463616.us-central1.run.app";
+
+      let selectedTable = localStorage.getItem("selectedTable") || "";
+      let currentRowData = {};
+
+      document.addEventListener("DOMContentLoaded", () => {
+        if (selectedTable) {
+          selectTable(selectedTable);
+        }
+      });
+
+      async function fetchTickets() {
+        try {
+          const response = await fetch(
+            `${fetchTicketsURL}?table=${selectedTable}`,
+            { mode: "cors" }
+          );
+          const data = await response.json();
+
+          if (data.status === "success" && Array.isArray(data.data)) {
+            displayTickets(data.data);
+          } else {
+            document.getElementById("ticketList").innerHTML =
+              "<tr><td colspan='1'>No tickets available.</td></tr>";
+          }
+        } catch (error) {
+          console.error("Error fetching tickets:", error);
+        }
+      }
+
+      function displayTickets(tickets) {
+        const ticketList = document.getElementById("ticketList");
+        ticketList.innerHTML = "";
+
+        tickets.forEach((ticket) => {
+          const row = document.createElement("tr");
+          row.classList.add("ticket-row");
+          row.innerHTML = `<td>${ticket.cfid}</td>`;
+          row.onclick = () => fetchFullTicketDetails(ticket.cfid);
+          ticketList.appendChild(row);
+        });
+      }
+
+      async function fetchFullTicketDetails(cfid) {
+        try {
+          const response = await fetch(
+            `${fetchTicketsURL}?table=${selectedTable}&cfid=${cfid}`,
+            { mode: "cors" }
+          );
+          const data = await response.json();
+
+          if (data.status === "success") {
+            loadAuditForm(data.data);
+          } else {
+            alert("Error loading ticket details.");
+          }
+        } catch (error) {
+          console.error("Error fetching ticket details:", error);
+        }
+      }
+
+      function loadAuditForm(ticket) {
+        currentRowData = ticket;
+        document.getElementById("ticketTable").classList.add("hidden");
+        document.getElementById("auditForm").classList.remove("hidden");
+
+        const tableBody = document.getElementById("dataTable");
+        tableBody.innerHTML = "";
+
+        for (const [key, value] of Object.entries(ticket)) {
+          const row = document.createElement("tr");
+          row.innerHTML = `<td><strong>${key}</strong></td><td>${
+            value !== null ? value : "N/A"
+          }</td>`;
+          tableBody.appendChild(row);
+        }
+
+        updateAuditCategoryField();
+      }
+
+      function updateAuditCategoryField() {
+        const container = document.getElementById("audit_category_container");
+        container.innerHTML = "";
+
+        if (selectedTable === "skipped_or_spam") {
+          const input = document.createElement("input");
+          input.type = "text";
+          input.id = "audit_category";
+          input.placeholder = "Enter audit category";
+          input.required = true;
+          container.appendChild(input);
+        } else {
+          const select = document.createElement("select");
+          select.id = "audit_category";
+          select.required = true;
+
+          const options =
+            selectedTable === "accounts_and_billings"
+              ? [
+                  "Needs human intervention",
+                  "Not wrong",
+                  "Genuinely wrong",
+                  "Comment not helpful",
+                  "Existing bug",
+                  "Custom code",
+                  "Custom code/Feature request",
+                  "No context",
+                  "Feature request",
+                  "Out of scope",
+                  "AI and HS answers are similar",
+                  "Need input from AM team",
+                  "Spam",
+                  "Skip",
+                ]
+              : [
+                  "Needs human intervention",
+                  "Not wrong",
+                  "Genuinely wrong",
+                  "Comment not helpful",
+                  "Existing bug",
+                  "Custom code",
+                  "Custom code/Feature request",
+                  "No context",
+                  "Feature request",
+                  "Out of scope",
+                  "Skip",
+                  "Spam",
+                  "AI and HS answers are similar",
+                  "Need input from AM team",
+                ];
+
+          const defaultOption = document.createElement("option");
+          defaultOption.value = "";
+          defaultOption.textContent = "Select a category";
+          select.appendChild(defaultOption);
+
+          options.forEach((opt) => {
+            const option = document.createElement("option");
+            option.value = opt;
+            option.textContent = opt;
+            select.appendChild(option);
+          });
+
+          container.appendChild(select);
+        }
+      }
+
+      async function submitFeedback() {
+        const auditCategory = document.getElementById("audit_category").value;
+        const auditDescription = document
+          .getElementById("audit_description")
+          .value.trim();
+
+        if (!auditCategory || !auditDescription) {
+          alert("Please fill in both fields.");
+          return;
+        }
+
+        const submissionData = {
+          table: selectedTable,
+          cfid: currentRowData.cfid,
+          audit_category: auditCategory,
+          audit_description: auditDescription,
+        };
+
+        try {
+          const response = await fetch(submitFeedbackURL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(submissionData),
+            mode: "cors",
+          });
+
+          if (response.ok) {
+            alert("Feedback submitted!");
+            returnToTicketList();
+          } else {
+            alert("Error submitting feedback.");
+          }
+        } catch (error) {
+          console.error("Error:", error);
+        }
+      }
+
+      function skipTicket() {
+        returnToTicketList();
+      }
+
+      function returnToTicketList() {
+        document.getElementById("auditForm").classList.add("hidden");
+        document.getElementById("ticketTable").classList.remove("hidden");
+        fetchTickets();
+      }
+
+      function loadTickets() {
+        if (!selectedTable) return;
+        localStorage.setItem("selectedTable", selectedTable);
+        fetchTickets();
+      }
+
+      function selectTable(tableName) {
+        selectedTable = tableName;
+        localStorage.setItem("selectedTable", selectedTable);
+
+        const headingMap = {
+          generative_first_reply: "Generative First Reply",
+          accounts_and_billings: "Accounts and Billings",
+          skipped_or_spam: "Skipped or Spam",
+        };
+
+        document.getElementById("tableHeading").textContent =
+          "Pending Audit Tickets for " + headingMap[tableName];
+
+        // Toggle visibility of filter sections
+        document
+          .getElementById("filterSection")
+          .classList.toggle("hidden", tableName !== "generative_first_reply");
+
+        document
+          .getElementById("abFilterSection")
+          .classList.toggle("hidden", tableName !== "accounts_and_billings");
+
+        document
+          .getElementById("sosFilterSection")
+          .classList.toggle("hidden", tableName !== "skipped_or_spam");
+
+        // Clear previous tickets
+        document.getElementById("ticketList").innerHTML = "";
+
+        // For skipped_or_spam, render dynamic reasons
+        if (tableName === "skipped_or_spam") {
+          renderSOSReasonFilters();
+        }
+
+        // Fetch tickets immediately for non-filter tables (or on filter apply)
+        if (tableName === "skipped_or_spam") {
+          // do nothing — wait for filter to be applied manually
+        } else if (tableName === "accounts_and_billings") {
+          // wait for applyABFilters()
+        } else if (tableName === "generative_first_reply") {
+          // wait for applyFilters()
+        } else {
+          fetchTickets();
+        }
+      }
+
+      function applyFilters() {
+        if (selectedTable !== "generative_first_reply") return;
+
+        const productCheckboxes = document.querySelectorAll(
+          "#productFilters input:checked"
+        );
+        const ratingCheckboxes = document.querySelectorAll(
+          "#ratingFilters input:checked"
+        );
+
+        const selectedProducts = Array.from(productCheckboxes).map(
+          (cb) => cb.value
+        );
+        const selectedRatings = Array.from(ratingCheckboxes).map(
+          (cb) => cb.value
+        );
+
+        let url =
+          "https://fetch-generative-first-reply-tickets-706657463616.us-central1.run.app";
+
+        const params = new URLSearchParams();
+
+        if (selectedProducts.length > 0) {
+          params.append("ptitle", selectedProducts.join(","));
+        }
+
+        if (selectedRatings.length > 0) {
+          params.append("rating", selectedRatings.join(","));
+        }
+
+        fetch(`${url}?${params.toString()}`, { mode: "cors" })
+          .then((res) => res.json())
+          .then((data) => {
+            if (data.status === "success" && Array.isArray(data.data)) {
+              displayTickets(data.data);
+            } else {
+              document.getElementById("ticketList").innerHTML =
+                "<tr><td colspan='1'>No tickets found for selected filters.</td></tr>";
+            }
+          })
+          .catch((err) => console.error("Error applying filters:", err));
+      }
+
+      function applyABFilters() {
+        const productCheckboxes = document.querySelectorAll(
+          "#abProductFilters input:checked"
+        );
+        const crCheckboxes = document.querySelectorAll(
+          "#crFilters input:checked"
+        );
+        const srrCheckboxes = document.querySelectorAll(
+          "#srrFilters input:checked"
+        );
+
+        const selectedProducts = Array.from(productCheckboxes).map(
+          (cb) => cb.value
+        );
+        const selectedCR = Array.from(crCheckboxes).map((cb) => cb.value);
+        const selectedSRR = Array.from(srrCheckboxes).map((cb) => cb.value);
+
+        let url =
+          "https://fetch-accounts-and-billings-tickets-706657463616.us-central1.run.app";
+
+        const params = new URLSearchParams();
+
+        if (selectedProducts.length > 0) {
+          params.append("ptitle", selectedProducts.join(","));
+        }
+
+        if (selectedCR.length > 0) {
+          params.append("categorization_rating", selectedCR.join(","));
+        }
+
+        if (selectedSRR.length > 0) {
+          params.append("saved_reply_rating", selectedSRR.join(","));
+        }
+
+        fetch(`${url}?${params.toString()}`, { mode: "cors" })
+          .then((res) => res.json())
+          .then((data) => {
+            if (data.status === "success" && Array.isArray(data.data)) {
+              displayTickets(data.data);
+            } else {
+              document.getElementById("ticketList").innerHTML =
+                "<tr><td colspan='1'>No tickets found for selected filters.</td></tr>";
+            }
+          })
+          .catch((err) => console.error("Error applying filters:", err));
+      }
+
+      const sosReasons = [
+        "Spam",
+        "SkipIdentifier",
+        "other",
+        "auto-renewal",
+        "string",
+        "renewal",
+        "link",
+        "promotional",
+        "marketing",
+        "reconsidering",
+        "feature-request",
+        "collaboration",
+        "account operation",
+        "media",
+        "vacation autoresponder",
+        "downgrade",
+        "onboarding",
+        "affiliate",
+        "upgrade",
+        "engagement",
+        "autoresponder",
+        "template-request",
+      ];
+
+      function renderSOSReasonFilters() {
+        const container = document.getElementById("reasonFilters");
+        container.innerHTML = "";
+
+        sosReasons.forEach((reason) => {
+          const label = document.createElement("label");
+          label.style = "display: block; margin-bottom: 6px;";
+          label.innerHTML = `<input type="checkbox" value="${reason}" /> ${reason}`;
+          container.appendChild(label);
+        });
+      }
+
+      function applySOSFilters() {
+        const productCheckboxes = document.querySelectorAll(
+          "#sosProductFilters input:checked"
+        );
+        const reasonCheckboxes = document.querySelectorAll(
+          "#reasonFilters input:checked"
+        );
+
+        const selectedProducts = Array.from(productCheckboxes).map(
+          (cb) => cb.value
+        );
+        const selectedReasons = Array.from(reasonCheckboxes).map(
+          (cb) => cb.value
+        );
+
+        let url =
+          "https://fetch-skipped-or-spam-tickets-706657463616.us-central1.run.app";
+
+        const params = new URLSearchParams();
+
+        if (selectedProducts.length > 0) {
+          params.append("ptitle", selectedProducts.join(","));
+        }
+
+        if (selectedReasons.length > 0) {
+          params.append("reason", selectedReasons.join(","));
+        }
+
+        fetch(`${url}?${params.toString()}`, { mode: "cors" })
+          .then((res) => res.json())
+          .then((data) => {
+            if (data.status === "success" && Array.isArray(data.data)) {
+              displayTickets(data.data);
+            } else {
+              document.getElementById("ticketList").innerHTML =
+                "<tr><td colspan='1'>No tickets found for selected filters.</td></tr>";
+            }
+          })
+          .catch((err) => console.error("Error applying filters:", err));
+      }
+    </script>
+  </body>
+</html>
